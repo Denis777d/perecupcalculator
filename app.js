@@ -1,259 +1,268 @@
-// Бизнес-трекер для GTA RP
-class BusinessTracker {
+// ============================================
+// ПЕРЕКУП КАЛЬКУЛЯТОР - JavaScript
+// ============================================
+
+class PerecupCalculator {
     constructor() {
         this.operations = [];
-        this.profiles = [
-            { id: 'resale', name: 'Перепродажи', icon: 'fa-tshirt', color: '#3b82f6' },
-            { id: 'auto', name: 'Автобизнес', icon: 'fa-car', color: '#ef4444' },
-            { id: 'realty', name: 'Недвижимость', icon: 'fa-home', color: '#10b981' }
-        ];
-        this.currentProfile = 'all';
-        this.currentPeriod = 'today';
+        this.currentFilter = 'all';
+        this.currentPeriod = 'all';
+        this.searchQuery = '';
+        this.sortDescending = true;
         
-        this.initialize();
+        this.init();
         this.loadFromStorage();
         this.render();
     }
     
-    initialize() {
-        // Инициализация даты
-        document.getElementById('opDate').valueAsDate = new Date();
+    // ========== ИНИЦИАЛИЗАЦИЯ ==========
+    init() {
+        // Установить сегодняшнюю дату
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('date').value = today;
+        document.getElementById('date').max = today;
         
-        // Обработчики кнопок
-        document.getElementById('addOperationBtn').addEventListener('click', () => this.toggleModal('operationModal'));
-        document.getElementById('quickAddBtn').addEventListener('click', () => this.toggleModal('operationModal'));
-        document.getElementById('addProfileBtn').addEventListener('click', () => this.toggleModal('profileModal'));
+        // Обработчики событий
+        this.setupEventListeners();
         
-        // Обработчики закрытия модальных окон
-        document.querySelectorAll('.close-modal').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.modal').forEach(modal => modal.classList.remove('active'));
-            });
+        // Показать приветствие
+        this.showNotification('Добро пожаловать в Перекуп Калькулятор!', 'info', 4000);
+    }
+    
+    setupEventListeners() {
+        // Кнопка добавления
+        document.getElementById('addBtn').addEventListener('click', () => this.showModal());
+        document.getElementById('quickAddBtn').addEventListener('click', () => this.showModal());
+        
+        // Кнопки в модальном окне
+        document.getElementById('closeModal').addEventListener('click', () => this.hideModal());
+        document.getElementById('cancelBtn').addEventListener('click', () => this.hideModal());
+        
+        // Клик вне модалки
+        document.getElementById('addModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('addModal')) {
+                this.hideModal();
+            }
         });
         
-        // Форма добавления операции
+        // Форма добавления
         document.getElementById('operationForm').addEventListener('submit', (e) => this.addOperation(e));
         
-        // Форма добавления профиля
-        document.getElementById('profileForm').addEventListener('submit', (e) => this.addProfile(e));
-        
-        // Кнопки выбора типа операции
+        // Кнопки типа операции
         document.querySelectorAll('.type-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                document.getElementById('opType').value = btn.dataset.type;
+                document.getElementById('operationType').value = btn.dataset.type;
             });
         });
         
-        // Кнопки выбора иконки
-        document.querySelectorAll('.icon-option').forEach(btn => {
+        // Фильтры
+        document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.icon-option').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                document.getElementById('profileIcon').value = btn.dataset.icon;
-            });
-        });
-        
-        // Фильтры профилей
-        document.querySelectorAll('.btn-sidebar').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (btn.id === 'addProfileBtn') return;
-                
-                document.querySelectorAll('.btn-sidebar').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.currentProfile = btn.dataset.profile;
-                this.updateProfileTitle();
+                this.currentFilter = btn.dataset.filter;
                 this.render();
             });
         });
         
-        // Фильтры периода
-        document.querySelectorAll('.period-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.currentPeriod = btn.dataset.period;
-                this.render();
-            });
-        });
-        
-        // Поиск
-        document.getElementById('searchInput').addEventListener('input', () => this.render());
-        
-        // Закрытие модальных окон при клике на фон
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                }
-            });
-        });
-        
-        // Добавление тестовых данных (можно удалить)
-        if (this.operations.length === 0) {
-            this.addTestData();
-        }
-    }
-    
-    addTestData() {
-        const testData = [
-            { type: 'income', amount: 30000, comment: 'Продал нереальные джинсы', profile: 'resale', date: this.getFormattedDate() },
-            { type: 'income', amount: 10000, comment: 'Крутая куртка', profile: 'resale', date: this.getFormattedDate() },
-            { type: 'expense', amount: 2000, comment: 'Бензин', profile: 'auto', date: this.getFormattedDate() },
-            { type: 'expense', amount: 15000, comment: 'Покупка Sultan', profile: 'auto', date: this.getFormattedDate(-1) },
-            { type: 'income', amount: 25000, comment: 'Продажа квартиры', profile: 'realty', date: this.getFormattedDate(-2) }
-        ];
-        
-        testData.forEach(data => this.operations.push(data));
-        this.saveToStorage();
-    }
-    
-    toggleModal(modalId) {
-        document.getElementById(modalId).classList.add('active');
-    }
-    
-    addOperation(e) {
-        e.preventDefault();
-        
-        const operation = {
-            id: Date.now(),
-            type: document.getElementById('opType').value,
-            amount: parseInt(document.getElementById('opAmount').value),
-            comment: document.getElementById('opComment').value,
-            profile: document.getElementById('opProfile').value,
-            date: document.getElementById('opDate').value
-        };
-        
-        this.operations.push(operation);
-        this.saveToStorage();
-        this.render();
-        
-        // Сброс формы и закрытие модального окна
-        document.getElementById('operationForm').reset();
-        document.getElementById('opDate').valueAsDate = new Date();
-        document.getElementById('opType').value = 'income';
-        document.querySelectorAll('.type-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.type === 'income') btn.classList.add('active');
-        });
-        
-        document.getElementById('operationModal').classList.remove('active');
-        
-        // Показать уведомление
-        this.showNotification(`Операция "${operation.comment}" добавлена!`, 'success');
-    }
-    
-    addProfile(e) {
-        e.preventDefault();
-        
-        const profile = {
-            id: 'profile_' + Date.now(),
-            name: document.getElementById('profileName').value,
-            icon: document.getElementById('profileIcon').value,
-            color: document.getElementById('profileColor').value
-        };
-        
-        this.profiles.push(profile);
-        this.saveToStorage();
-        
-        // Добавление кнопки в сайдбар
-        const sidebar = document.querySelector('.sidebar-section:first-child');
-        const newBtn = document.createElement('button');
-        newBtn.className = 'btn-sidebar';
-        newBtn.dataset.profile = profile.id;
-        newBtn.innerHTML = `<i class="fas ${profile.icon}"></i> ${profile.name}`;
-        newBtn.style.borderLeft = `3px solid ${profile.color}`;
-        
-        newBtn.addEventListener('click', () => {
-            document.querySelectorAll('.btn-sidebar').forEach(b => b.classList.remove('active'));
-            newBtn.classList.add('active');
-            this.currentProfile = profile.id;
-            this.updateProfileTitle();
+        // Период
+        document.getElementById('periodSelect').addEventListener('change', (e) => {
+            this.currentPeriod = e.target.value;
             this.render();
         });
         
-        sidebar.insertBefore(newBtn, document.getElementById('addProfileBtn'));
+        // Поиск
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            this.searchQuery = e.target.value.toLowerCase();
+            this.render();
+        });
         
-        // Сброс формы и закрытие модального окна
-        document.getElementById('profileForm').reset();
-        document.getElementById('profileModal').classList.remove('active');
+        document.getElementById('clearSearch').addEventListener('click', () => {
+            document.getElementById('searchInput').value = '';
+            this.searchQuery = '';
+            this.render();
+        });
         
-        this.showNotification(`Профиль "${profile.name}" создан!`, 'success');
+        // Сортировка
+        document.getElementById('sortDateBtn').addEventListener('click', () => {
+            this.sortDescending = !this.sortDescending;
+            this.render();
+        });
+        
+        // Экспорт/Импорт
+        document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
+        document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+        document.getElementById('importFile').addEventListener('change', (e) => this.importData(e));
+        
+        // Очистка данных
+        document.getElementById('clearBtn').addEventListener('click', () => this.clearData());
+        
+        // Горячие клавиши
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+N - новая сделка
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                this.showModal();
+            }
+            // Esc - закрыть модалку
+            if (e.key === 'Escape') {
+                this.hideModal();
+            }
+        });
+    }
+    
+    // ========== РАБОТА С ДАННЫМИ ==========
+    loadFromStorage() {
+        try {
+            const saved = localStorage.getItem('perecup-calculator-data');
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.operations = data.operations || [];
+                this.showNotification('Данные загружены из локального хранилища', 'success');
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки данных:', error);
+        }
+    }
+    
+    saveToStorage() {
+        try {
+            const data = {
+                operations: this.operations,
+                lastSave: new Date().toISOString(),
+                version: '2.0'
+            };
+            localStorage.setItem('perecup-calculator-data', JSON.stringify(data));
+        } catch (error) {
+            console.error('Ошибка сохранения данных:', error);
+        }
+    }
+    
+    // ========== ОПЕРАЦИИ ==========
+    addOperation(e) {
+        e.preventDefault();
+        
+        const type = document.getElementById('operationType').value;
+        const amount = parseInt(document.getElementById('amount').value);
+        const category = document.getElementById('category').value;
+        const description = document.getElementById('description').value.trim();
+        const date = document.getElementById('date').value;
+        
+        // Валидация
+        if (!description || isNaN(amount) || amount <= 0) {
+            this.showNotification('Заполните все поля корректно!', 'error');
+            return;
+        }
+        
+        // Создаём операцию
+        const operation = {
+            id: Date.now(),
+            type: type,
+            amount: amount,
+            category: category,
+            description: description,
+            date: date,
+            createdAt: new Date().toISOString()
+        };
+        
+        // Добавляем
+        this.operations.push(operation);
+        
+        // Сохраняем
+        this.saveToStorage();
+        
+        // Закрываем модалку
+        this.hideModal();
+        
+        // Сбрасываем форму
+        e.target.reset();
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('operationType').value = 'income';
+        document.querySelectorAll('.type-btn')[0].click();
+        
+        // Показываем уведомление
+        this.showNotification('Сделка успешно добавлена!', 'success');
+        
+        // Обновляем интерфейс
+        this.render();
     }
     
     deleteOperation(id) {
+        if (!confirm('Удалить эту сделку? Это действие нельзя отменить.')) {
+            return;
+        }
+        
         this.operations = this.operations.filter(op => op.id !== id);
         this.saveToStorage();
+        this.showNotification('Сделка удалена', 'warning');
         this.render();
-        this.showNotification('Операция удалена!', 'danger');
     }
     
-    updateProfileTitle() {
-        if (this.currentProfile === 'all') {
-            document.getElementById('currentProfile').textContent = 'Все операции';
-        } else {
-            const profile = this.profiles.find(p => p.id === this.currentProfile);
-            document.getElementById('currentProfile').textContent = profile ? profile.name : 'Операции';
-        }
-    }
-    
-    getFormattedDate(daysOffset = 0) {
-        const date = new Date();
-        date.setDate(date.getDate() + daysOffset);
-        return date.toISOString().split('T')[0];
-    }
-    
+    // ========== ФИЛЬТРАЦИЯ И СОРТИРОВКА ==========
     getFilteredOperations() {
         let filtered = [...this.operations];
         
-        // Фильтрация по профилю
-        if (this.currentProfile !== 'all') {
-            filtered = filtered.filter(op => op.profile === this.currentProfile);
+        // Фильтр по типу
+        if (this.currentFilter === 'income') {
+            filtered = filtered.filter(op => op.type === 'income');
+        } else if (this.currentFilter === 'expense') {
+            filtered = filtered.filter(op => op.type === 'expense');
         }
         
-        // Фильтрация по периоду
-        const now = new Date();
-        let startDate = new Date();
-        
-        switch (this.currentPeriod) {
-            case 'today':
-                startDate.setHours(0, 0, 0, 0);
-                break;
-            case 'week':
-                startDate.setDate(now.getDate() - 7);
-                break;
-            case 'month':
-                startDate.setMonth(now.getMonth() - 1);
-                break;
-            case 'all':
-                startDate = new Date(0); // Начало времён
-                break;
+        // Фильтр по периоду
+        if (this.currentPeriod !== 'all') {
+            const now = new Date();
+            let startDate = new Date();
+            
+            switch (this.currentPeriod) {
+                case 'today':
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+                case 'week':
+                    startDate.setDate(now.getDate() - 7);
+                    break;
+                case 'month':
+                    startDate.setMonth(now.getMonth() - 1);
+                    break;
+                case 'year':
+                    startDate.setFullYear(now.getFullYear() - 1);
+                    break;
+            }
+            
+            filtered = filtered.filter(op => {
+                const opDate = new Date(op.date + 'T00:00:00');
+                return opDate >= startDate;
+            });
         }
         
-        filtered = filtered.filter(op => {
-            const opDate = new Date(op.date);
-            return opDate >= startDate && opDate <= now;
-        });
-        
-        // Фильтрация по поиску
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        if (searchTerm) {
+        // Поиск
+        if (this.searchQuery) {
             filtered = filtered.filter(op => 
-                op.comment.toLowerCase().includes(searchTerm)
+                op.description.toLowerCase().includes(this.searchQuery) ||
+                op.category.toLowerCase().includes(this.searchQuery)
             );
         }
         
-        return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+        // Сортировка по дате
+        filtered.sort((a, b) => {
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            return this.sortDescending ? dateB - dateA : dateA - dateB;
+        });
+        
+        return filtered;
     }
     
-    calculateStats() {
-        const operations = this.getFilteredOperations();
+    // ========== СТАТИСТИКА ==========
+    calculateStats(operations = null) {
+        const ops = operations || this.getFilteredOperations();
         
         let income = 0;
         let expense = 0;
         
-        operations.forEach(op => {
+        ops.forEach(op => {
             if (op.type === 'income') {
                 income += op.amount;
             } else {
@@ -261,83 +270,89 @@ class BusinessTracker {
             }
         });
         
-        const profit = income - expense;
-        
-        return { income, expense, profit };
+        return {
+            total: ops.length,
+            income: income,
+            expense: expense,
+            profit: income - expense
+        };
     }
     
-    formatCurrency(amount) {
-        return '$' + amount.toLocaleString('ru-RU');
-    }
-    
+    // ========== РЕНДЕРИНГ ==========
     render() {
         const operations = this.getFilteredOperations();
-        const stats = this.calculateStats();
+        const stats = this.calculateStats(operations);
+        const allStats = this.calculateStats(this.operations);
         
-        // Обновление статистики
-        document.getElementById('totalIncome').textContent = this.formatCurrency(stats.income);
-        document.getElementById('totalExpense').textContent = this.formatCurrency(stats.expense);
-        document.getElementById('totalProfit').textContent = this.formatCurrency(stats.profit);
+        // Обновляем общую статистику
+        this.updateElement('totalOperations', allStats.total);
+        this.updateElement('totalIncome', this.formatCurrency(allStats.income));
+        this.updateElement('totalExpense', this.formatCurrency(allStats.expense));
+        this.updateElement('totalProfit', this.formatCurrency(allStats.profit));
         
-        document.getElementById('incomeCard').textContent = this.formatCurrency(stats.income);
-        document.getElementById('expenseCard').textContent = this.formatCurrency(stats.expense);
-        document.getElementById('profitCard').textContent = this.formatCurrency(stats.profit);
+        // Обновляем быструю статистику (с фильтрами)
+        this.updateElement('quickIncome', this.formatCurrency(stats.income));
+        this.updateElement('quickExpense', this.formatCurrency(stats.expense));
+        this.updateElement('quickProfit', this.formatCurrency(stats.profit));
         
-        // Обновление меток периода
-        const periodLabels = document.querySelectorAll('#periodLabel, #periodLabel2, #periodLabel3');
-        const periodTexts = {
-            'today': 'сегодня',
-            'week': 'неделю',
-            'month': 'месяц',
-            'all': 'всё время'
-        };
-        periodLabels.forEach(label => {
-            label.textContent = periodTexts[this.currentPeriod];
-        });
+        // Обновляем счётчики поиска
+        this.updateElement('foundCount', operations.length);
+        this.updateElement('totalCount', this.operations.length);
         
-        // Отрисовка таблицы
+        // Рендерим таблицу
+        this.renderTable(operations);
+    }
+    
+    renderTable(operations) {
         const tableBody = document.getElementById('operationsTable');
-        tableBody.innerHTML = '';
         
         if (operations.length === 0) {
+            const message = this.searchQuery ? 'По вашему запросу ничего не найдено' : 'Пока нет сделок';
+            const hint = this.searchQuery ? 'Попробуйте изменить поисковый запрос' : 'Начните добавлять сделки по перепродажам';
+            
             tableBody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="empty-message">
-                        <i class="fas fa-clipboard-list" style="font-size: 2rem; margin-bottom: 1rem; display: block;"></i>
-                        Нет операций за выбранный период
+                <tr class="empty-row">
+                    <td colspan="6">
+                        <div class="empty-message">
+                            <i class="fas fa-${this.searchQuery ? 'search' : 'box-open'}"></i>
+                            <h4>${message}</h4>
+                            <p>${hint}</p>
+                        </div>
                     </td>
                 </tr>
             `;
             return;
         }
         
+        tableBody.innerHTML = '';
+        
         operations.forEach(op => {
-            const profile = this.profiles.find(p => p.id === op.profile) || this.profiles[0];
             const row = document.createElement('tr');
+            
+            // Категории
+            const categoryNames = {
+                'clothes': 'Одежда',
+                'shoes': 'Обувь',
+                'accessories': 'Аксессуары',
+                'other': 'Другое'
+            };
             
             row.innerHTML = `
                 <td>
-                    <div class="operation-type ${op.type}">
+                    <div class="op-type ${op.type}">
                         <i class="fas fa-${op.type === 'income' ? 'arrow-up' : 'arrow-down'}"></i>
                     </div>
                 </td>
-                <td class="operation-amount ${op.type}">
+                <td class="amount-cell ${op.type}">
                     ${op.type === 'income' ? '+' : '-'}${this.formatCurrency(op.amount)}
                 </td>
-                <td>${op.comment}</td>
-                <td>
-                    <span class="profile-badge" style="background: ${profile.color}20; color: ${profile.color};">
-                        <i class="fas ${profile.icon}"></i>
-                        ${profile.name}
-                    </span>
-                </td>
+                <td>${op.description}</td>
+                <td><span class="category-tag">${categoryNames[op.category] || op.category}</span></td>
                 <td>${new Date(op.date).toLocaleDateString('ru-RU')}</td>
                 <td>
-                    <div class="action-buttons">
-                        <button class="action-btn" title="Удалить" onclick="tracker.deleteOperation(${op.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
+                    <button class="action-btn" onclick="calculator.deleteOperation(${op.id})" title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </td>
             `;
             
@@ -345,79 +360,140 @@ class BusinessTracker {
         });
     }
     
-    showNotification(message, type = 'info') {
-        // Создаём уведомление
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'}"></i>
-            ${message}
-        `;
+    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+    updateElement(id, content) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = content;
+        }
+    }
+    
+    formatCurrency(amount) {
+        return '$' + amount.toLocaleString('ru-RU');
+    }
+    
+    showModal() {
+        document.getElementById('addModal').classList.add('show');
+    }
+    
+    hideModal() {
+        document.getElementById('addModal').classList.remove('show');
+    }
+    
+    // ========== УВЕДОМЛЕНИЯ ==========
+    showNotification(message, type = 'info', duration = 3000) {
+        const notification = document.getElementById('notification');
         
-        // Стили для уведомления
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'success' ? '#10b981' : type === 'danger' ? '#ef4444' : '#3b82f6'};
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            z-index: 9999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideIn 0.3s ease;
-        `;
+        notification.textContent = message;
+        notification.className = `notification ${type} show`;
         
-        document.body.appendChild(notification);
+        // Иконка в зависимости от типа
+        const icon = type === 'success' ? 'check-circle' :
+                    type === 'error' ? 'exclamation-circle' :
+                    type === 'warning' ? 'exclamation-triangle' : 'info-circle';
         
-        // Удаляем уведомление через 3 секунды
+        notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+        
+        // Автоматическое скрытие
         setTimeout(() => {
-            notification.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-        
-        // Добавляем анимации в CSS
-        if (!document.getElementById('notification-styles')) {
-            const style = document.createElement('style');
-            style.id = 'notification-styles';
-            style.textContent = `
-                @keyframes slideIn {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                }
-                @keyframes slideOut {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(100%); opacity: 0; }
-                }
-            `;
-            document.head.appendChild(style);
-        }
+            notification.classList.remove('show');
+        }, duration);
     }
     
-    saveToStorage() {
-        localStorage.setItem('business-tracker-operations', JSON.stringify(this.operations));
-        localStorage.setItem('business-tracker-profiles', JSON.stringify(this.profiles));
+    // ========== ЭКСПОРТ/ИМПОРТ ==========
+    exportData() {
+        const data = {
+            operations: this.operations,
+            exportedAt: new Date().toISOString(),
+            totalOperations: this.operations.length,
+            stats: this.calculateStats(this.operations)
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        
+        a.href = url;
+        a.download = `перекуп-калькулятор-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.showNotification('Данные успешно экспортированы', 'success');
     }
     
-    loadFromStorage() {
-        const savedOperations = localStorage.getItem('business-tracker-operations');
-        const savedProfiles = localStorage.getItem('business-tracker-profiles');
+    importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
         
-        if (savedOperations) {
-            this.operations = JSON.parse(savedOperations);
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                if (!data.operations || !Array.isArray(data.operations)) {
+                    throw new Error('Неверный формат файла');
+                }
+                
+                // Подтверждение импорта
+                if (!confirm(`Импортировать ${data.operations.length} сделок? Текущие данные будут сохранены.`)) {
+                    return;
+                }
+                
+                // Сохраняем текущие данные как резервную копию
+                const backup = {
+                    operations: this.operations,
+                    backedUpAt: new Date().toISOString()
+                };
+                localStorage.setItem('perecup-calculator-backup', JSON.stringify(backup));
+                
+                // Импортируем новые данные
+                this.operations = data.operations;
+                this.saveToStorage();
+                this.render();
+                
+                this.showNotification(`Успешно импортировано ${data.operations.length} сделок`, 'success');
+                
+                // Очищаем input файла
+                event.target.value = '';
+                
+            } catch (error) {
+                this.showNotification('Ошибка при импорте файла: ' + error.message, 'error');
+                console.error('Ошибка импорта:', error);
+            }
+        };
+        
+        reader.readAsText(file);
+    }
+    
+    // ========== ОЧИСТКА ДАННЫХ ==========
+    clearData() {
+        if (!confirm('ВНИМАНИЕ! Вы собираетесь удалить ВСЕ данные.\n\nЭто действие нельзя отменить!\n\nПеред удалением рекомендуется экспортировать данные.')) {
+            return;
         }
         
-        if (savedProfiles) {
-            this.profiles = JSON.parse(savedProfiles);
+        if (confirm('Последнее предупреждение! Удалить ВСЕ данные безвозвратно?')) {
+            this.operations = [];
+            localStorage.removeItem('perecup-calculator-data');
+            this.render();
+            this.showNotification('Все данные успешно очищены', 'warning');
         }
     }
 }
 
-// Инициализация приложения
-let tracker;
+// ========== ЗАПУСК ПРИЛОЖЕНИЯ ==========
+
+let calculator;
+
 document.addEventListener('DOMContentLoaded', () => {
-    tracker = new BusinessTracker();
+    calculator = new PerecupCalculator();
+    window.calculator = calculator;
+    
+    // Глобальные функции
+    window.addOperation = () => calculator.showModal();
+    window.exportData = () => calculator.exportData();
+    window.importData = () => document.getElementById('importFile').click();
+    window.clearData = () => calculator.clearData();
 });
